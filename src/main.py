@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 
 from block_markdown import markdown_to_html_node
@@ -40,7 +41,7 @@ def extract_title(markdown: str) -> str:
     return title
 
 
-def generate_page(from_path: str, template_path: str, dest_path: str):
+def generate_page(from_path: str, template_path: str, dest_path: str, basepath: str):
     print(f"Generating page: {from_path} to {dest_path} using template {template_path}")
     with open(from_path, "r") as f:
         markdown = f.read()
@@ -49,8 +50,12 @@ def generate_page(from_path: str, template_path: str, dest_path: str):
 
         with open(template_path, "r") as template_file:
             template = template_file.read()
-            template = template.replace("{{ Title }}", title)
-            template = template.replace("{{ Content }}", html)
+            template = (
+                template.replace("{{ Title }}", title)
+                .replace("{{ Content }}", html)
+                .replace('href="/', f'href="{basepath}')
+                .replace('src="/', f'src="{basepath}')
+            )
 
             if not os.path.dirname(dest_path):
                 os.mkdir(os.path.dirname(dest_path))
@@ -59,7 +64,7 @@ def generate_page(from_path: str, template_path: str, dest_path: str):
 
 
 def generate_pages_recursively(
-    dir_path_content: str, template_path: str, dest_dir_path: str
+    dir_path_content: str, template_path: str, dest_dir_path: str, basepath: str
 ):
     if not os.path.exists(dest_dir_path):
         os.mkdir(dest_dir_path)
@@ -69,19 +74,28 @@ def generate_pages_recursively(
         filename_without_extension = os.path.splitext(file)[0]
         if os.path.isdir(new_file):
             generate_pages_recursively(
-                new_file, template_path, os.path.join(dest_dir_path, file)
+                new_file, template_path, os.path.join(dest_dir_path, file), basepath
             )
         else:
             generate_page(
                 new_file,
                 template_path,
                 os.path.join(dest_dir_path, filename_without_extension + ".html"),
+                basepath,
             )
 
 
 def main():
-    copy_from_dir("static", "public")
-    generate_pages_recursively("content", "template.html", "public")
+    if len(sys.argv) == 2:
+        basepath = sys.argv[1]
+    elif len(sys.argv) > 2:
+        print("Too many arguments, wtf are you doing?")
+        sys.exit(1)
+    else:
+        basepath = "/"
+
+    copy_from_dir("static", "docs")
+    generate_pages_recursively("content", "template.html", "docs", basepath)
 
 
 if __name__ == "__main__":
